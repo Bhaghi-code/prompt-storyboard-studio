@@ -13,6 +13,7 @@ type StoryFrame = {
   copyHeadline: string;
   copySupporting: string;
   cta: string;
+  imageUrl?: string;
 };
 
 type PaletteKey = 'pastel' | 'neon' | 'cinematic';
@@ -25,6 +26,8 @@ export default function HomePage() {
   const [storyboardFrames, setStoryboardFrames] = useState<StoryFrame[] | null>(
     null
   );
+
+  const [includeVisuals, setIncludeVisuals] = useState(true);
 
   // Which card's "Firefly prompt" is expanded
   const [openPromptId, setOpenPromptId] = useState<number | null>(null);
@@ -96,7 +99,7 @@ export default function HomePage() {
       const response = await fetch('/api/generate-storyboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brief, style, tone, frames }),
+        body: JSON.stringify({ brief, style, tone, frames, includeVisuals }),
       });
 
       if (!response.ok) {
@@ -249,6 +252,34 @@ export default function HomePage() {
                     />
                   </div>
 
+                  {/* Generate visuals toggle */}
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-[11px] text-slate-500 font-medium">
+                      Generate visuals
+                      </p>
+                      <p className="text-[10px] text-slate-400">
+                        Turn off to save tokens / speed up.
+                      </p>
+                    </div>
+                    <button
+                    type="button"
+                    onClick={() => setIncludeVisuals((v) => !v)}
+                    className={'relative inline-flex h-6 w-11 items-center rounded-full border transition-colors ' +
+                      (includeVisuals
+                        ? 'bg-emerald-500 border-emerald-500'
+                        : 'bg-slate-300 border-slate-200')
+                        }
+                  >
+                  
+                    <span
+                      className={'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ' +
+                        (includeVisuals ? 'translate-x-5' : 'translate-x-1')
+                      }
+                    />
+                    </button>
+                  </div>
+
                   {/* Platforms */}
                   <div className="flex flex-wrap gap-2 text-[11px]">
                     <span className="px-2 py-1 rounded-full bg-[#fbf1e3] border border-orange-100 text-slate-700">
@@ -304,13 +335,23 @@ export default function HomePage() {
               <div className="flex-1 overflow-x-auto pb-4">
                 <div className="flex gap-5 md:gap-6 min-w-max pr-4">
                   {framesToShow.map((frame, index) => {
-                    const imageUrl = imageForIndex(index);
+                    const imageUrl = frame.imageUrl || imageForIndex(index);
                     const isPromptOpen = openPromptId === frame.id;
 
                     return (
                       <div
                         key={frame.id}
-                        className="min-w-[260px] md:min-w-[280px] max-w-xs bg-[#fefbf6] border border-orange-100 rounded-3xl shadow-md hover:shadow-xl transition-shadow duration-150 overflow-hidden"
+                        className="min-w-[260px] md:min-w-[280px] max-w-xs
+                                   bg-[#fff9f0]/95 backdrop-blur
+                                   border border-orange-100
+                                   rounded-3xl
+                                   shadow-md shadow-orange-100/70
+                                   hover:shadow-xl hover:shadow-orange-200/90
+                                   overflow-hidden
+                                   float-soft
+                                   transition-transform transition-shadow duration-300
+                                   hover:scale-[1.02]
+                                   will-change-transform"
                       >
                         {/* Image */}
                         <button
@@ -323,7 +364,7 @@ export default function HomePage() {
                           <img
                             src={imageUrl}
                             alt={frame.sceneTitle}
-                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ken-burns-soft"
                           />
                           <div className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded-md bg-black/70 text-[10px] font-semibold tracking-[0.14em] uppercase text-white">
                             Fi

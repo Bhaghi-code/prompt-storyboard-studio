@@ -24,3 +24,44 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ---------------------------------------------------------------------- */
+/* Floating card animation */
+/* ---------------------------------------------------------------------- */
+@keyframes float-card {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@layer utilities {
+  .float-soft {
+    animation: float-card 9s ease-in-out infinite;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Ken Burns style pan/zoom for frame images */
+/* ---------------------------------------------------------------------- */
+@keyframes ken-burns-soft {
+  0% {
+    transform: scale(1.02) translateY(0);
+  }
+  50% {
+    transform: scale(1.08) translateY(-4px);
+  }
+  100% {
+    transform: scale(1.05) translateY(2px);
+  }
+}
+
+@layer utilities {
+  .ken-burns-soft {
+    animation: ken-burns-soft 14s ease-in-out infinite alternate;
+    transform-origin: center;
+  }
+}
+

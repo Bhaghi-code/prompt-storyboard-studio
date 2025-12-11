@@ -6,16 +6,30 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+type RawFrame = {
+  frameNumber: number;
+  sceneTitle: string;
+  beatPurpose: string;
+  emotion: string;
+  visualPrompt: string;
+  cameraAngle: string;
+  copyHeadline: string;
+  copySupporting: string;
+  cta: string;
+};
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { brief, style, tone, frames } = body as {
+    const { brief, style, tone, frames, includeVisuals } = body as {
       brief: string;
       style: string;
       tone: string;
       frames: number;
+      includeVisuals?: boolean;
     };
 
+    // --- 1. Ask the Responses API for the structured storyboard ---------
     const prompt = `
 You are a creative director generating a storyboard for a marketing campaign.
 
@@ -26,18 +40,18 @@ Visual style: ${style}
 Tone of copy: ${tone}
 Number of frames: ${frames}
 
-For each frame, create SCENE INTELLIGENCE with:
+For each frame, create:
 - frameNumber (1 to ${frames})
-- sceneTitle (short, cinematic name for this beat)
-- beatPurpose (what this scene is doing in the story: e.g., set-up, conflict, reveal, social proof, CTA)
-- emotion (one or two words: Wonder, Nostalgia, Urgency, Calm, etc.)
-- visualPrompt (detailed visual description that could be used directly as a prompt for Adobe Firefly)
-- cameraAngle (e.g., close-up, wide shot, over-the-shoulder, aerial, etc.)
-- copyHeadline (short main line of copy for this frame)
-- copySupporting (1–2 sentences of supporting copy)
-- cta (short call-to-action)
+- sceneTitle (short descriptive title)
+- beatPurpose (set-up / reveal / conflict / social proof / CTA etc.)
+- emotion (single word like "Wonder", "Nostalgia", "Urgency")
+- visualPrompt (detailed description of the scene for an image generator)
+- cameraAngle (e.g. "wide shot", "close-up", "over-the-shoulder")
+- copyHeadline (short main text)
+- copySupporting (1–3 sentence body copy)
+- cta (short call-to-action label)
 
-Return ONLY valid JSON in this exact shape (no prose, no markdown):
+Return ONLY valid JSON in this exact shape:
 
 {
   "frames": [
@@ -62,57 +76,14 @@ Return ONLY valid JSON in this exact shape (no prose, no markdown):
     });
 
     const text = response.output[0].content[0].text;
-    console.log('Raw model output:', text);
-
-    // Clean possible ```json ... ``` wrappers
     const cleaned = text
       .replace(/```json/i, '')
       .replace(/```/g, '')
       .trim();
 
-    type AiFrame = {
-      frameNumber: number;
-      sceneTitle: string;
-      beatPurpose: string;
-      emotion: string;
-      visualPrompt: string;
-      cameraAngle: string;
-      copyHeadline: string;
-      copySupporting: string;
-      cta: string;
-    };
+    const parsed = JSON.parse(cleaned) as { frames: RawFrame[] };
 
-        let parsed: { frames: AiFrame[] };
-
-    try {
-      // First attempt: parse as-is
-      parsed = JSON.parse(cleaned);
-    } catch (e1) {
-      console.warn(
-        'First JSON.parse failed, trying to fix escaped quotes. Original cleaned value:\n',
-        cleaned,
-        e1
-      );
-
-      // Second attempt: fix patterns like : \"Text\" → : "Text"
-      const fixedOnce = cleaned.replace(/:\s*\\"([^"]*)\\"/g, ': "$1"');
-
-      try {
-        parsed = JSON.parse(fixedOnce);
-      } catch (e2) {
-        console.error(
-          'JSON parse still failing. Final payload was:\n',
-          fixedOnce,
-          e2
-        );
-        return NextResponse.json(
-          { error: 'Model did not return valid JSON.' },
-          { status: 500 }
-        );
-      }
-    }
-
-    const generatedFrames = parsed.frames.map((f) => ({
+    let framesWithIds = parsed.frames.map((f) => ({
       id: f.frameNumber,
       sceneTitle: f.sceneTitle,
       beatPurpose: f.beatPurpose,
@@ -122,9 +93,42 @@ Return ONLY valid JSON in this exact shape (no prose, no markdown):
       copyHeadline: f.copyHeadline,
       copySupporting: f.copySupporting,
       cta: f.cta,
+      imageUrl: undefined as string | undefined,
     }));
 
-    return NextResponse.json({ frames: generatedFrames });
+    // --- 2. Optionally call the Images API for each frame ---------------
+    if (includeVisuals) {
+      const imagePromises = framesWithIds.map(async (frame) => {
+        try {
+          const imagePrompt =
+            `High quality cinematic illustration of: ${frame.visualPrompt}. ` +
+            `Campaign style: ${style}. Tone: ${tone}. ` +
+            'No text or typography in the image.';
+
+          const img = await client.images.generate({
+            model: 'gpt-image-1',
+            prompt: imagePrompt,
+            size: '1024x1024',
+            n: 1,
+            // default response_format is "url"
+          });
+
+          const url = (img.data[0] as any).url as string | undefined;
+
+          return {
+            ...frame,
+            imageUrl: url,
+          };
+        } catch (e) {
+          console.error('Image generation failed for frame', frame.id, e);
+          return frame; // fall back to text-only frame
+        }
+      });
+
+      framesWithIds = await Promise.all(imagePromises);
+    }
+
+    return NextResponse.json({ frames: framesWithIds });
   } catch (error) {
     console.error('Error generating storyboard:', error);
     return NextResponse.json(
