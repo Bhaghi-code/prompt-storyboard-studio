@@ -2,6 +2,8 @@
 'use client';
 
 import { useState } from 'react';
+import confetti from "canvas-confetti";
+
 
 type StoryFrame = {
   id: number;
@@ -23,6 +25,9 @@ export default function HomePage() {
   const [style, setStyle] = useState('Minimal');
   const [tone, setTone] = useState('Professional');
   const [frames, setFrames] = useState(4);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [genId, setGenId] = useState(0);
   const [storyboardFrames, setStoryboardFrames] = useState<StoryFrame[] | null>(
     null
   );
@@ -65,6 +70,33 @@ export default function HomePage() {
 
   const [palette, setPalette] = useState<PaletteKey>('pastel');
 
+  const paletteBg: Record<
+  PaletteKey,
+  { from: string; via: string; to: string; glow: string }
+> = {
+  pastel: {
+    from: "from-amber-50",
+    via: "via-rose-50",
+    to: "to-sky-50",
+    glow: "shadow-orange-100/70",
+  },
+  neon: {
+    from: "from-fuchsia-50",
+    via: "via-violet-50",
+    to: "to-cyan-50",
+    glow: "shadow-fuchsia-200/60",
+  },
+  cinematic: {
+    from: "from-stone-100",
+    via: "via-amber-50",
+    to: "to-slate-100",
+    glow: "shadow-slate-200/60",
+  },
+};
+
+const mood = paletteBg[palette];
+
+
   const shufflePalette = () => {
     const keys: PaletteKey[] = ['pastel', 'neon', 'cinematic'];
     const others = keys.filter((k) => k !== palette);
@@ -95,25 +127,54 @@ export default function HomePage() {
 
   // --- API call --------------------------------------------------------------
   const handleGenerate = async () => {
-    try {
-      const response = await fetch('/api/generate-storyboard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brief, style, tone, frames, includeVisuals }),
-      });
+  setIsGenerating(true);
+  setErrorMsg(null);
 
-      if (!response.ok) {
-        throw new Error('Failed to generate storyboard');
-      }
+  // Optional: show "skeleton" frames immediately so the UI feels alive
+  setStoryboardFrames(
+    Array.from({ length: frames }).map((_, i) => ({
+      id: i + 1,
+      sceneTitle: `Generating frame ${i + 1}...`,
+      beatPurpose: 'Generating…',
+      emotion: '…',
+      visualPrompt: 'Creating story + visuals…',
+      cameraAngle: '…',
+      copyHeadline: 'Generating…',
+      copySupporting: 'Please wait…',
+      cta: '…',
+      imageUrl: undefined, // placeholder state
+    }))
+  );
 
-      const data = await response.json();
-      setStoryboardFrames(data.frames);
-      setOpenPromptId(null);
-    } catch (err) {
-      console.error(err);
-      alert('Something went wrong generating the storyboard');
+  try {
+    const response = await fetch('/api/generate-storyboard', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brief, style, tone, frames, includeVisuals }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || 'Failed to generate storyboard');
     }
-  };
+
+    const data = await response.json();
+    setGenId((v) => v + 1);
+    setStoryboardFrames(data.frames);
+    confetti({
+      particleCount: 120,
+      spread: 70,
+      origin: { y: 0.7 },
+    });
+    setOpenPromptId(null);
+  } catch (err: any) {
+    console.error(err);
+    setErrorMsg('Something went wrong generating the storyboard.');
+  } finally {
+    setIsGenerating(false);
+  }
+};
+
 
   // Build the Firefly prompt text for a given frame
   const buildFireflyPrompt = (frame: StoryFrame) => {
@@ -127,8 +188,11 @@ export default function HomePage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f7efe4] text-slate-900">
-      {/* Top app bar */}
+    <main className={`min-h-screen text-slate-900 bg-gradient-to-br 
+    ${mood.from} ${mood.via} ${mood.to}
+    transition-colors duration-500`}
+    >
+
       <header className="h-14 border-b border-orange-100 bg-[#fdf7ee]/80 backdrop-blur flex items-center justify-between px-6 md:px-10">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-xl bg-slate-900 text-amber-50 flex items-center justify-center text-xs font-semibold shadow">
@@ -158,7 +222,8 @@ export default function HomePage() {
 
       {/* Main content */}
       <div className="px-3 md:px-6 py-6 md:py-8 flex justify-center">
-        <div className="w-full max-w-7xl bg-[#fdf8f1] rounded-3xl border border-orange-100 shadow-xl shadow-orange-100/70 overflow-hidden">
+        <div className={`w-full max-w-7xl bg-[#fdf8f1] rounded-3xl border border-orange-100 shadow-xl ${mood.glow} overflow-hidden`}
+        >
           <div className="flex flex-col md:flex-row">
             {/* LEFT: controls */}
             <section className="md:flex-[0_0_320px] lg:flex-[0_0_360px] border-b md:border-b-0 md:border-r border-orange-100 p-6 md:p-7 flex flex-col gap-4">
@@ -296,15 +361,21 @@ export default function HomePage() {
 
                 <button
                   onClick={handleGenerate}
-                  className="mt-1 inline-flex items-center justify-center rounded-2xl bg-amber-500 hover:bg-amber-400 px-4 py-2.5 text-sm font-medium text-amber-50 shadow-md shadow-amber-300/70 transition-colors"
+                  className={`mt-1 inline-flex items-center justify-center rounded-2xl px-4 py-2.5 text-sm font-medium shadow-md transition-colors
+                    ${isGenerating ? 'bg-slate-300 text-slate-600 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-400 text-amber-50 shadow-amber-300/70'}`}
                 >
-                  Generate storyboard
+                  {isGenerating ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span className="h-4 w-4 rounded-full border-2 border-slate-500 border-t-transparent animate-spin" />
+                      Generating…
+                    </span>
+                  ) : (
+                    'Generate storyboard'
+                  )}
                 </button>
               </div>
 
-              <p className="mt-auto text-[11px] text-slate-400 pt-4 border-t border-orange-100">
-                Phase 1: story intelligence · Phase 2: Firefly handoff & motion
-              </p>
+              
             </section>
 
             {/* RIGHT: storyboard */}
@@ -335,12 +406,16 @@ export default function HomePage() {
               <div className="flex-1 overflow-x-auto pb-4">
                 <div className="flex gap-5 md:gap-6 min-w-max pr-4">
                   {framesToShow.map((frame, index) => {
-                    const imageUrl = frame.imageUrl || imageForIndex(index);
+                    const hasAiImage = Boolean(frame.imageUrl);
+                    const showPlaceholder = isGenerating && includeVisuals && !hasAiImage;
+                    const imageUrl = hasAiImage ? (frame.imageUrl as string) : imageForIndex(index);
                     const isPromptOpen = openPromptId === frame.id;
 
                     return (
                       <div
-                        key={frame.id}
+                        //key={frame.id}
+                        key={`${genId}-${frame.id}`}
+                        style={{ animationDelay: `${index * 90}ms` }}
                         className="min-w-[260px] md:min-w-[280px] max-w-xs
                                    bg-[#fff9f0]/95 backdrop-blur
                                    border border-orange-100
@@ -351,7 +426,11 @@ export default function HomePage() {
                                    float-soft
                                    transition-transform transition-shadow duration-300
                                    hover:scale-[1.02]
-                                   will-change-transform"
+                                   will-change-transform
+                                   opacity-0 
+                                   animate-cardIn"
+                                    
+                                   
                       >
                         {/* Image */}
                         <button
@@ -364,8 +443,17 @@ export default function HomePage() {
                           <img
                             src={imageUrl}
                             alt={frame.sceneTitle}
-                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ken-burns-soft"
+                            className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ken-burns-soft
+                              ${showPlaceholder ? 'opacity-50 blur-[1px]' : ''}`}
                           />
+                          {showPlaceholder && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="h-3 w-3 rounded-full border-2 border-white/80 border-t-transparent animate-spin" />
+                                Generating image…
+                              </div>
+                            </div>
+                             )}
                           <div className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded-md bg-black/70 text-[10px] font-semibold tracking-[0.14em] uppercase text-white">
                             Fi
                           </div>

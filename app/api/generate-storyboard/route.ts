@@ -1,6 +1,8 @@
 // app/api/generate-storyboard/route.ts
-import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import { NextResponse } from "next/server";
+import OpenAI from "openai";
+
+export const runtime = "nodejs"; // important (avoid Edge runtime issues)
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -29,12 +31,11 @@ export async function POST(request: Request) {
       includeVisuals?: boolean;
     };
 
-    // --- 1. Ask the Responses API for the structured storyboard ---------
     const prompt = `
 You are a creative director generating a storyboard for a marketing campaign.
 
 Campaign brief:
-"${brief || 'No specific brief provided'}"
+"${brief || "No specific brief provided"}"
 
 Visual style: ${style}
 Tone of copy: ${tone}
@@ -71,14 +72,14 @@ Return ONLY valid JSON in this exact shape:
 `;
 
     const response = await client.responses.create({
-      model: 'gpt-4.1-mini',
+      model: "gpt-4.1-mini",
       input: prompt,
     });
 
-    const text = response.output[0].content[0].text;
+    const text = response.output_text ?? "";
     const cleaned = text
-      .replace(/```json/i, '')
-      .replace(/```/g, '')
+      .replace(/```json/i, "")
+      .replace(/```/g, "")
       .trim();
 
     const parsed = JSON.parse(cleaned) as { frames: RawFrame[] };
@@ -93,46 +94,55 @@ Return ONLY valid JSON in this exact shape:
       copyHeadline: f.copyHeadline,
       copySupporting: f.copySupporting,
       cta: f.cta,
-      imageUrl: undefined as string | undefined,
+      imageUrl: null as string | null, // use null so it shows in JSON (optional)
     }));
 
-    // --- 2. Optionally call the Images API for each frame ---------------
     if (includeVisuals) {
-      const imagePromises = framesWithIds.map(async (frame) => {
-        try {
-          const imagePrompt =
-            `High quality cinematic illustration of: ${frame.visualPrompt}. ` +
-            `Campaign style: ${style}. Tone: ${tone}. ` +
-            'No text or typography in the image.';
+      framesWithIds = await Promise.all(
+        framesWithIds.map(async (frame) => {
+          try {
+            const imagePrompt =
+              `High quality cinematic illustration of: ${frame.visualPrompt}. ` +
+              `Campaign style: ${style}. Tone: ${tone}. ` +
+              `Camera angle: ${frame.cameraAngle}. ` +
+              "No text, no typography, no watermarks.";
 
-          const img = await client.images.generate({
-            model: 'gpt-image-1',
-            prompt: imagePrompt,
-            size: '1024x1024',
-            n: 1,
-            // default response_format is "url"
-          });
+            console.log("includeVisuals:", includeVisuals, "hasKey:", !!process.env.OPENAI_API_KEY);
+  
 
-          const url = (img.data[0] as any).url as string | undefined;
+            const img = await client.images.generate({
+              model: "gpt-image-1",
+              prompt: imagePrompt,
+              size: "1024x1024",
+             //response_format: "b64_json",
+            });
 
-          return {
-            ...frame,
-            imageUrl: url,
-          };
-        } catch (e) {
-          console.error('Image generation failed for frame', frame.id, e);
-          return frame; // fall back to text-only frame
-        }
-      });
+            const b64 = (img.data?.[0] as any)?.b64_json as string | undefined;
 
-      framesWithIds = await Promise.all(imagePromises);
+            return {
+              ...frame,
+              imageUrl: b64 ? `data:image/png;base64,${b64}` : null,
+            };
+          } catch (e: any) {
+            console.error("Image generation failed", {
+              frameId: frame.id,
+              status: e?.status,
+              message: e?.message,
+              error: e?.error,
+              type: e?.type,
+              code: e?.code,
+            });
+            return frame; // fallback: keep null imageUrl
+          }
+        })
+      );
     }
 
     return NextResponse.json({ frames: framesWithIds });
   } catch (error) {
-    console.error('Error generating storyboard:', error);
+    console.error("Error generating storyboard:", error);
     return NextResponse.json(
-      { error: 'Failed to generate storyboard' },
+      { error: "Failed to generate storyboard" },
       { status: 500 }
     );
   }
