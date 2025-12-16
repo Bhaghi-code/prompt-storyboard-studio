@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Prompt-to-Storyboard Studio 🎬✨
 
-## Getting Started
+**Prompt-to-Storyboard Studio** is an AI-assisted creative tool that transforms a simple campaign brief into a structured, visual storyboard — complete with moodboards, AI-generated imagery, and Firefly-ready prompts.
 
-First, run the development server:
+🎥 **Product Demo (2 min):**  
+👉 https://youtu.be/5L0riliJRMs
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## What problem does this solve?
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Creative teams often struggle to go from:
+- vague campaign ideas  
+- to structured visual storytelling  
+- to actionable creative assets  
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+This tool bridges that gap by using AI to:
+- structure campaign narratives
+- generate visual direction
+- accelerate creative exploration
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## Key Features
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- 🧠 **AI-generated storyboard frames** from a single campaign brief  
+- 🎨 **Dynamic moodboard palettes** (Pastel, Neon, Cinematic)  
+- 🖼️ **Image generation via OpenAI Image API**  
+- ✨ **Micro-interactions & animations** for premium UX feedback  
+- 🎉 **Completion feedback** using subtle confetti interaction  
+- 🔁 **Firefly-ready prompts** for downstream design tools  
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## Product & UX Highlights
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Visual generation is **optional** → balances speed, cost, and creativity  
+- Palette switching demonstrates **design-system flexibility**  
+- Story frames mirror **real creative workflows**, not generic AI output  
+- UI emphasizes clarity, sequencing, and creative handoff  
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## Tech Stack
+
+- **Frontend:** Next.js (App Router), Tailwind CSS  
+- **AI:** OpenAI Responses API, Image Generation API  
+- **UX:** Micro-animations, loading states, motion feedback  
+
+---
+
+## Project Status
+
+This is a **concept lab / product exploration** showcasing how AI can enhance creative workflows for marketers, designers, and product teams.
+
+---
+
+📌 Built with a product-first mindset — focusing on experience, flow, and usability, not just output.
